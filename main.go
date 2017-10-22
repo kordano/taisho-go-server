@@ -26,8 +26,8 @@ func perror(err error) {
 func GetTrelloMembers(w http.ResponseWriter, r *http.Request) {
 	const (
 		trelloURL   = "https://api.trello.com/1/boards/wF8wnpha/members"
-		trelloKey   = "d5eb90af629773d627ad6449bd733318"
-		trelloToken = "580440ae3857fd9f0cd0dbcf950d6cf1beeccbd6ea64c31e064efb9219e67584"
+		trelloKey   = ""
+		trelloToken = ""
 	)
 
 	req, err := http.NewRequest("GET", trelloURL, nil)
