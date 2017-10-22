@@ -7,15 +7,12 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+
+	"github.com/kordano/taisho-go-server/models"
 )
 
-type TrelloMember struct {
-	Id       string `json:"id"`
-	FullName string `json:"fullName"`
-	UserName string `json:"username"`
-}
-
-type TrelloMemberResponse []TrelloMember
+var configuration models.Configuration
 
 func perror(err error) {
 	if err != nil {
@@ -23,23 +20,29 @@ func perror(err error) {
 	}
 }
 
-func GetTrelloMembers(w http.ResponseWriter, r *http.Request) {
-	const (
-		trelloURL   = "https://api.trello.com/1/boards/wF8wnpha/members"
-		trelloKey   = ""
-		trelloToken = ""
-	)
+func parseConfig() {
+	configFile, err := os.Open("config.json")
+	perror(err)
 
-	req, err := http.NewRequest("GET", trelloURL, nil)
+	jsonParser := json.NewDecoder(configFile)
+	if err = jsonParser.Decode(&configuration); err != nil {
+		fmt.Println("parsing error!")
+	}
+	return
+}
+
+func fetchURL(endpoint string) []byte {
+	trelloMemberURL := configuration.Trello.BaseURL + endpoint
+
+	req, err := http.NewRequest("GET", trelloMemberURL, nil)
 	perror(err)
 
 	q := req.URL.Query()
-	q.Add("key", trelloKey)
-	q.Add("token", trelloToken)
+	q.Add("key", configuration.Trello.Key)
+	q.Add("token", configuration.Trello.Token)
 	req.URL.RawQuery = q.Encode()
 
 	req.Close = true
-	fmt.Println(req)
 	resp, err := http.DefaultClient.Do(req)
 	perror(err)
 
@@ -47,8 +50,16 @@ func GetTrelloMembers(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(resp.Body)
 	perror(err)
 
-	var data TrelloMemberResponse
-	err = json.Unmarshal(body, &data)
+	return body
+}
+
+func GetTrelloMembers(w http.ResponseWriter, r *http.Request) {
+	body := fetchURL("/boards/wF8wnpha/members")
+
+	var data models.TrelloMemberResponse
+	err := json.Unmarshal(body, &data)
+	perror(err)
+
 	trelloMembers, err := json.Marshal(&data)
 	perror(err)
 
@@ -58,6 +69,8 @@ func GetTrelloMembers(w http.ResponseWriter, r *http.Request) {
 var mux map[string]func(http.ResponseWriter, *http.Request)
 
 func main() {
+	parseConfig()
+
 	server := http.Server{
 		Addr:    ":8000",
 		Handler: &myHandler{},
