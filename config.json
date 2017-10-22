@@ -2,6 +2,7 @@
     "trello": 
     {
         "key": "",
-        "token": ""
+        "token": "",
+        "baseURL": "https://api.trello.com/1"
     }
 }
