@@ -1,7 +1,7 @@
 package models
 
 type TrelloMember struct {
-	Id       string `json:"id"`
+	ID       string `json:"id"`
 	FullName string `json:"fullName"`
 	UserName string `json:"username"`
 }

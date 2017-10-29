@@ -20,21 +20,21 @@ func perror(err error) {
 	}
 }
 
-func parseConfig() {
+func setConfig(configuration *models.Configuration) {
 	configFile, err := os.Open("config.json")
 	perror(err)
 
 	jsonParser := json.NewDecoder(configFile)
-	if err = jsonParser.Decode(&configuration); err != nil {
+	if err = jsonParser.Decode(configuration); err != nil {
 		fmt.Println("parsing error!")
 	}
 	return
 }
 
 func fetchURL(endpoint string) []byte {
-	trelloMemberURL := configuration.Trello.BaseURL + endpoint
+	trelloURL := configuration.Trello.BaseURL + endpoint
 
-	req, err := http.NewRequest("GET", trelloMemberURL, nil)
+	req, err := http.NewRequest("GET", trelloURL, nil)
 	perror(err)
 
 	q := req.URL.Query()
@@ -53,6 +53,7 @@ func fetchURL(endpoint string) []byte {
 	return body
 }
 
+// GetTrelloMembers fetches Trello Members of Development Board
 func GetTrelloMembers(w http.ResponseWriter, r *http.Request) {
 	body := fetchURL("/boards/wF8wnpha/members")
 
@@ -66,10 +67,24 @@ func GetTrelloMembers(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, string(trelloMembers))
 }
 
+// GetTrelloBoardLists retrieves all Trello Lists on Development Board
+func GetTrelloBoardLists(w http.ResponseWriter, r *http.Request) {
+	body := fetchURL("/boards/wF8wnpha/lists")
+
+	var data models.TrelloListsResponse
+	err := json.Unmarshal(body, &data)
+	perror(err)
+
+	trelloBoard, err := json.Marshal(&data)
+	perror(err)
+
+	io.WriteString(w, string(trelloBoard))
+}
+
 var mux map[string]func(http.ResponseWriter, *http.Request)
 
 func main() {
-	parseConfig()
+	setConfig(&configuration)
 
 	server := http.Server{
 		Addr:    ":8000",
@@ -77,6 +92,7 @@ func main() {
 	}
 	mux = make(map[string]func(http.ResponseWriter, *http.Request))
 	mux["/"] = GetTrelloMembers
+	mux["/board"] = GetTrelloBoardLists
 
 	log.Print("Server started: localhost:8000")
 	server.ListenAndServe()
