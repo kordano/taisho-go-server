@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/kordano/taisho-go-server/models"
+	"github.com/kordano/taisho-server/models"
 )
 
 var configuration models.Configuration
