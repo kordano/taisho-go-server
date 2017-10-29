@@ -69,8 +69,8 @@ func GetTrelloMembers(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetTrelloBoardLists retrieves all Trello Lists on Development Board
-func GetTrelloBoardLists(listID string) ([]models.TrelloBoardList, error) {
-	body := fetchURL("/boards/" + listID + "/lists")
+func GetTrelloBoardLists(boardID string) ([]models.TrelloBoardList, error) {
+	body := fetchURL("/boards/" + boardID + "/lists")
 
 	var data []models.TrelloBoardList
 	err := json.Unmarshal(body, &data)
@@ -80,6 +80,54 @@ func GetTrelloBoardLists(listID string) ([]models.TrelloBoardList, error) {
 	}
 
 	return data, nil
+}
+
+func GetTrelloListCards(listID string) ([]models.TrelloCard, error) {
+	body := fetchURL("/lists/" + listID + "/cards")
+
+	var data []models.TrelloCard
+	err := json.Unmarshal(body, &data)
+	if err != nil {
+		log.Fatal(err)
+		return []models.TrelloCard{}, err
+	}
+
+	return data, err
+}
+
+// GetProjectLists fetches all
+func GetProjectLists(boardID string) ([]models.ProjectList, error) {
+	boardLists, err := GetTrelloBoardLists(boardID)
+	if err != nil {
+		log.Fatal(err)
+		return []models.ProjectList{}, err
+	}
+	projectLists := make(chan models.ProjectList, len(boardLists))
+	errs := make(chan error, len(boardLists))
+
+	for _, boardList := range boardLists {
+		go func(b models.TrelloBoardList) {
+			cards, err := GetTrelloListCards(b.ID)
+			if err != nil {
+				errs <- err
+				return
+			}
+			projectLists <- models.ProjectList{List: b, Cards: cards}
+		}(boardList)
+	}
+
+	finalList := []models.ProjectList{}
+
+	for i := 0; i < len(boardLists); i++ {
+		select {
+		case pl := <-projectLists:
+			finalList = append(finalList, pl)
+		case err := <-errs:
+			return finalList, err
+		}
+	}
+
+	return finalList, err
 }
 
 var mux map[string]func(http.ResponseWriter, *http.Request)
@@ -94,17 +142,20 @@ func main() {
 	mux = make(map[string]func(http.ResponseWriter, *http.Request))
 	mux["/"] = GetTrelloMembers
 	mux["/board"] = func(w http.ResponseWriter, r *http.Request) {
-		boardLists, err := GetTrelloBoardLists(BoardID)
+		projectLists, err := GetProjectLists(BoardID)
 		perror(err)
 
-		boardListsJSON, err := json.Marshal(&boardLists)
+		projectListsJSON, err := json.Marshal(&projectLists)
 		perror(err)
 
-		io.WriteString(w, string(boardListsJSON))
+		io.WriteString(w, string(projectListsJSON))
 	}
 
 	log.Print("Server started: localhost:8000")
-	server.ListenAndServe()
+	err := server.ListenAndServe()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 type myHandler struct{}
