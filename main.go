@@ -13,6 +13,7 @@ import (
 )
 
 var configuration models.Configuration
+var BoardID = "wF8wnpha"
 
 func perror(err error) {
 	if err != nil {
@@ -57,7 +58,7 @@ func fetchURL(endpoint string) []byte {
 func GetTrelloMembers(w http.ResponseWriter, r *http.Request) {
 	body := fetchURL("/boards/wF8wnpha/members")
 
-	var data models.TrelloMemberResponse
+	var data []models.TrelloMember
 	err := json.Unmarshal(body, &data)
 	perror(err)
 
@@ -68,17 +69,17 @@ func GetTrelloMembers(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetTrelloBoardLists retrieves all Trello Lists on Development Board
-func GetTrelloBoardLists(w http.ResponseWriter, r *http.Request) {
-	body := fetchURL("/boards/wF8wnpha/lists")
+func GetTrelloBoardLists(listID string) ([]models.TrelloBoardList, error) {
+	body := fetchURL("/boards/" + listID + "/lists")
 
-	var data models.TrelloListsResponse
+	var data []models.TrelloBoardList
 	err := json.Unmarshal(body, &data)
-	perror(err)
+	if err != nil {
+		log.Fatal(err)
+		return []models.TrelloBoardList{}, err
+	}
 
-	trelloBoard, err := json.Marshal(&data)
-	perror(err)
-
-	io.WriteString(w, string(trelloBoard))
+	return data, nil
 }
 
 var mux map[string]func(http.ResponseWriter, *http.Request)
@@ -92,7 +93,15 @@ func main() {
 	}
 	mux = make(map[string]func(http.ResponseWriter, *http.Request))
 	mux["/"] = GetTrelloMembers
-	mux["/board"] = GetTrelloBoardLists
+	mux["/board"] = func(w http.ResponseWriter, r *http.Request) {
+		boardLists, err := GetTrelloBoardLists(BoardID)
+		perror(err)
+
+		boardListsJSON, err := json.Marshal(&boardLists)
+		perror(err)
+
+		io.WriteString(w, string(boardListsJSON))
+	}
 
 	log.Print("Server started: localhost:8000")
 	server.ListenAndServe()
